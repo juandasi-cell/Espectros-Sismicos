@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Espectros de respuesta — Método de Chopra (8 constantes)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..600&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;650&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="byline">
+    <span class="byline__avatar">JM</span>
+    <span class="byline__text">
+      <span class="byline__name">Juan David Mosquera Angulo</span>
+      <span class="byline__tag">Entrega 2 · Espectros Sísmicos</span>
+    </span>
+  </div>
+  <div class="app-header__text">
+    <span class="eyebrow">Chopra · Integración directa</span>
+    <h1>Espectros de respuesta <em>sísmica</em></h1>
+  </div>
+</header>
+
+<div id="errorBanner" class="error-banner" role="alert" hidden>
+  <svg class="error-banner__icon" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.4"/>
+    <path d="M8 4.6V8.8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+    <circle cx="8" cy="11.2" r="0.9" fill="currentColor"/>
+  </svg>
+  <span id="errorBannerText"></span>
+  <button type="button" id="errorBannerClose" class="error-banner__close" aria-label="Cerrar aviso">
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M1.5 1.5l9 9M10.5 1.5l-9 9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+  </button>
+</div>
+
+<main class="app-main">
+  <ol class="stepper" id="stepper">
+
+    <li class="step" id="step1" data-collapsible>
+      <button type="button" class="step__header" id="step1Toggle" aria-expanded="true" aria-controls="step1Content">
+        <span class="step__badge" id="step1Badge">1</span>
+        <span class="step__heading">
+          <h2 class="step__title">Cargar los 5 registros sísmicos</h2>
+          <span class="step__status" id="step1State">Esperando archivos…</span>
+        </span>
+        <svg class="step__chevron" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3.5 5.25L7 8.75l3.5-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="step__content" id="step1Content">
+        <div class="step__content-inner">
+          <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Seleccionar o soltar los archivos de registros sísmicos">
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true" class="dropzone__icon">
+              <path d="M14 4v13.5M14 4l-4.5 4.5M14 4l4.5 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M5 18.5v3A2.5 2.5 0 0 0 7.5 24h13a2.5 2.5 0 0 0 2.5-2.5v-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+            <p class="dropzone__text"><strong>Arrastra aquí</strong> los 5 archivos de registros sísmicos, o haz clic para seleccionarlos.</p>
+            <p class="dropzone__hint">Se identifican automáticamente por sismo y componente — no importa el orden.</p>
+            <input type="file" id="fileInput" multiple accept=".md,.txt,.at2,.dat" class="dropzone__input">
+          </div>
+
+          <div class="table-scroll">
+            <table id="validationTable" class="data-table">
+              <thead>
+                <tr><th>Registro</th><th>Archivo</th><th class="num">Puntos (leído / esperado)</th><th class="num">Pico (leído / esperado, cm/s²)</th><th>Estado</th></tr>
+              </thead>
+              <tbody id="validationBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </li>
+
+    <li class="step" id="step2" data-collapsible>
+      <button type="button" class="step__header" id="step2Toggle" aria-expanded="true" aria-controls="step2Content">
+        <span class="step__badge" id="step2Badge">2</span>
+        <span class="step__heading">
+          <h2 class="step__title">Verificación contra la sección 7 del SPEC</h2>
+          <span class="step__status" id="step7Banner">Esperando los 5 registros validados…</span>
+        </span>
+        <svg class="step__chevron" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3.5 5.25L7 8.75l3.5-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="step__content" id="step2Content">
+        <div class="step__content-inner">
+          <div id="step7Tables" class="check-tables" hidden>
+            <section class="check-block">
+              <h3>Chequeo 1 — x, v, Sv, h, I, J, Sa, SaN en T = 1.00 s, ξ = 5 %</h3>
+              <div class="table-scroll">
+                <table id="check1Table" class="data-table data-table--dense">
+                  <thead><tr><th>Registro</th><th class="num">x</th><th class="num">v</th><th class="num">Sv</th><th class="num">h</th><th class="num">I</th><th class="num">J</th><th class="num">Sa</th><th class="num">SaN</th><th class="num">Δ máx.</th></tr></thead>
+                  <tbody id="check1Body"></tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="check-block">
+              <h3>Chequeo 2 — pico del espectro de SaN (ξ = 5 %) y periodo donde ocurre</h3>
+              <div class="table-scroll">
+                <table id="check2Table" class="data-table data-table--dense">
+                  <thead><tr><th>Registro</th><th class="num">SaN máx (calc.)</th><th class="num">SaN máx (ref.)</th><th class="num">T calc. (s)</th><th class="num">T ref. (s)</th><th>Estado</th></tr></thead>
+                  <tbody id="check2Body"></tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="check-block">
+              <h3>Chequeo 3 — J en T ≈ 0 (T = 0.001 s) ≈ PGA/g</h3>
+              <div class="table-scroll">
+                <table id="check3Table" class="data-table data-table--dense">
+                  <thead><tr><th>Registro</th><th class="num">J calc.</th><th class="num">PGA/g ref.</th><th>Estado</th></tr></thead>
+                  <tbody id="check3Body"></tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="check-block">
+              <h3>Chequeo 4 — Chopra (8 constantes) vs. integración directa, en T = 1.00 s, ξ = 5 %</h3>
+              <div class="table-scroll">
+                <table id="check4Table" class="data-table data-table--dense">
+                  <thead><tr><th>Registro</th><th class="num">x (Chopra)</th><th class="num">x (directa)</th><th class="num">Δ relativa</th><th>Estado</th></tr></thead>
+                  <tbody id="check4Body"></tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </li>
+
+    <li class="step step--main" id="step3">
+      <div class="step__header step__header--static">
+        <span class="step__badge" id="step3Badge">3</span>
+        <span class="step__heading">
+          <h2 class="step__title">Espectros de respuesta</h2>
+          <span class="step__status">Barrido completo — 1001 periodos × 5 amortiguamientos</span>
+        </span>
+      </div>
+
+      <div id="plotSection" class="plot locked">
+        <div class="plot__lockNote" id="plotLockNote">Completa los pasos 1 y 2 para habilitar el barrido completo.</div>
+
+        <div class="plot__body">
+          <aside class="plot__sidebar">
+            <div class="field">
+              <label for="registroSelect">Registro sísmico</label>
+              <div class="select-wrap">
+                <select id="registroSelect"></select>
+              </div>
+            </div>
+            <div class="field">
+              <label for="respuestaSelect">Tipo de respuesta</label>
+              <div class="select-wrap">
+                <select id="respuestaSelect"></select>
+              </div>
+            </div>
+            <div class="field">
+              <label for="methodSelect">Método de cálculo</label>
+              <div class="select-wrap">
+                <select id="methodSelect">
+                  <option value="chopra">Chopra (8 constantes)</option>
+                  <option value="directa">Integración directa</option>
+                </select>
+              </div>
+            </div>
+
+            <div id="progressWrap" class="progress" role="status" aria-live="polite">
+              <div class="progress__row">
+                <span id="progressText">Calculando…</span>
+              </div>
+              <div id="progressBarOuter" class="progress__track"><div id="progressBarInner" class="progress__fill"></div></div>
+            </div>
+
+            <div id="legend" class="legend" aria-label="Curvas mostradas"></div>
+
+            <p class="hint">Pasa el cursor sobre el gráfico para leer valores exactos. Haz clic en una curva de la leyenda para aislarla.</p>
+          </aside>
+
+          <div class="plot__chart">
+            <div class="chart-block">
+              <h3 class="chart-block__title">Acelerograma — a<sub>g</sub>(t) [cm/s²]</h3>
+              <div class="chart-wrap chart-wrap--mini">
+                <canvas id="accelCanvas"></canvas>
+                <canvas id="accelOverlay"></canvas>
+                <div id="accelTooltip" class="chart-tooltip" hidden></div>
+              </div>
+            </div>
+
+            <div class="chart-block">
+              <h3 class="chart-block__title" id="spectrumTitle">Espectro de respuesta — Chopra (8 constantes)</h3>
+              <div class="chart-wrap">
+                <canvas id="chartCanvas"></canvas>
+                <canvas id="chartOverlay"></canvas>
+                <div id="chartTooltip" class="chart-tooltip" hidden></div>
+              </div>
+            </div>
+            <p class="hint">Compara la forma del espectro con el acelerograma del mismo componente, arriba.</p>
+          </div>
+        </div>
+      </div>
+    </li>
+
+  </ol>
+</main>
+
+<script src="chopra.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
