@@ -507,7 +507,7 @@ option:checked { background-color: var(--accent-soft); color: var(--accent-stron
   background: radial-gradient(120% 140% at 15% 0%, rgba(217, 119, 87, 0.06), transparent 55%), var(--surface);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
-#chartCanvas, #accelCanvas { width: 100%; height: 460px; display: block; cursor: crosshair; }
+#chartCanvas, #accelCanvas { width: 100%; height: 460px; display: block; cursor: crosshair; touch-action: none; }
 @keyframes chartFadeIn { from { opacity: 0.3; filter: saturate(0.6); } to { opacity: 1; filter: saturate(1); } }
 .chart-fade-in { animation: chartFadeIn 420ms var(--ease); }
 .chart-wrap--mini #accelCanvas { height: 220px; }
@@ -543,8 +543,16 @@ option:checked { background-color: var(--accent-soft); color: var(--accent-stron
   .plot__sidebar { flex-direction: row; flex-wrap: wrap; gap: var(--sp-4); }
   .field { flex: 1 1 160px; }
   .legend { flex-direction: row; flex-wrap: wrap; width: 100%; }
+  .legend-item { padding: 8px 10px; } /* objetivo táctil más cómodo que en escritorio */
   #chartCanvas { height: 340px; }
   .chart-wrap--mini #accelCanvas { height: 160px; }
+}
+
+@media (max-width: 480px) {
+  .byline { margin-bottom: var(--sp-6); }
+  .app-header h1 { font-size: 1.5rem; }
+  .eyebrow { font-size: 0.625rem; letter-spacing: 0.1em; }
+  .step__title { font-size: var(--text-md); }
 }
 
 @media (prefers-reduced-motion: reduce) {

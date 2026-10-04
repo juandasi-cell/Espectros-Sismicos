@@ -1188,6 +1188,7 @@ function onChartPointer(clientX, clientY, canvas, overlay, tooltip, wrap, getSta
     const ttW = tooltip.offsetWidth || 160;
     const ttH = tooltip.offsetHeight || 80;
     if (left + ttW > wrapRect.width - 4) left = mx - ttW - 16;
+    if (left < 4) left = 4; // en pantallas angostas, ni mx+16 ni mx-ttW-16 caben: se ancla al borde del gráfico
     if (top + ttH > wrapRect.height - 4) top = wrapRect.height - ttH - 4;
     if (top < 4) top = 4;
     tooltip.style.left = left + 'px';
@@ -1206,6 +1207,22 @@ accelCanvas.addEventListener('mousemove', (e) =>
   onChartPointer(e.clientX, e.clientY, accelCanvas, accelOverlay, accelTooltip, accelWrap, () => lastAccelState, (x) => `t = ${x.toFixed(3)} s`)
 );
 accelCanvas.addEventListener('mouseleave', () => hideTooltip(accelOverlay, accelTooltip));
+
+// Táctil: no hay "hover" en móvil, así que tocar y arrastrar sobre el gráfico
+// hace lo mismo que mover el mouse (mismo crosshair/tooltip que en escritorio).
+function bindTouchPointer(canvas, overlay, tooltip, wrap, getState, formatX) {
+  const onTouch = (e) => {
+    if (e.touches.length !== 1) return;
+    e.preventDefault(); // evita que el toque haga scroll/zoom de la página en vez de mover el crosshair
+    const t = e.touches[0];
+    onChartPointer(t.clientX, t.clientY, canvas, overlay, tooltip, wrap, getState, formatX);
+  };
+  canvas.addEventListener('touchstart', onTouch, { passive: false });
+  canvas.addEventListener('touchmove', onTouch, { passive: false });
+  canvas.addEventListener('touchend', () => hideTooltip(overlay, tooltip));
+}
+bindTouchPointer(chartCanvas, chartOverlay, chartTooltip, chartWrap, () => lastChartState, (x) => `T = ${x.toFixed(3)} s`);
+bindTouchPointer(accelCanvas, accelOverlay, accelTooltip, accelWrap, () => lastAccelState, (x) => `t = ${x.toFixed(3)} s`);
 
 let resizeRaf = null;
 window.addEventListener('resize', () => {
