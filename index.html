@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Espectros de respuesta — Método de Chopra (8 constantes)</title>
+<title>Espectros de respuesta — Interpolación de la Excitación</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..600&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;650&display=swap" rel="stylesheet">
@@ -20,7 +20,7 @@
     </span>
   </div>
   <div class="app-header__text">
-    <span class="eyebrow">Chopra · Integración directa</span>
+    <span class="eyebrow">Interpolación de la Excitación · Integración Directa</span>
     <h1>Espectros de respuesta <em>sísmica</em></h1>
   </div>
 </header>
@@ -57,7 +57,7 @@
               <path d="M5 18.5v3A2.5 2.5 0 0 0 7.5 24h13a2.5 2.5 0 0 0 2.5-2.5v-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
             </svg>
             <p class="dropzone__text"><strong>Arrastra aquí</strong> los 5 archivos de registros sísmicos, o haz clic para seleccionarlos.</p>
-            <p class="dropzone__hint">Se identifican automáticamente por sismo y componente — no importa el orden.</p>
+            <p class="dropzone__hint">Se identifican automáticamente por sismo y componente — no importa el orden. También puedes subir cualquier otro archivo de registro en el mismo formato: se añade como registro adicional en el paso 3.</p>
             <input type="file" id="fileInput" multiple accept=".md,.txt,.at2,.dat" class="dropzone__input">
           </div>
 
@@ -69,6 +69,16 @@
               <tbody id="validationBody"></tbody>
             </table>
           </div>
+
+          <div class="table-scroll" id="customFilesWrap" hidden>
+            <table id="customFilesTable" class="data-table data-table--dense">
+              <thead>
+                <tr><th>Archivo adicional</th><th class="num">Puntos</th><th class="num">Pico (cm/s²)</th><th>Estado</th></tr>
+              </thead>
+              <tbody id="customFilesBody"></tbody>
+            </table>
+          </div>
+          <p class="hint" id="customFilesHint" hidden>Estos archivos no pertenecen a la tabla 1 del SPEC, así que no se validan contra valores de referencia — pero quedan disponibles como registro en el paso 3 una vez habilitado el barrido.</p>
         </div>
       </div>
     </li>
@@ -116,10 +126,10 @@
             </section>
 
             <section class="check-block">
-              <h3>Chequeo 4 — Chopra (8 constantes) vs. integración directa, en T = 1.00 s, ξ = 5 %</h3>
+              <h3>Chequeo 4 — Interpolación de la Excitación vs. integración directa, en T = 1.00 s, ξ = 5 %</h3>
               <div class="table-scroll">
                 <table id="check4Table" class="data-table data-table--dense">
-                  <thead><tr><th>Registro</th><th class="num">x (Chopra)</th><th class="num">x (directa)</th><th class="num">Δ relativa</th><th>Estado</th></tr></thead>
+                  <thead><tr><th>Registro</th><th class="num">x (interp.)</th><th class="num">x (directa)</th><th class="num">Δ relativa</th><th>Estado</th></tr></thead>
                   <tbody id="check4Body"></tbody>
                 </table>
               </div>
@@ -159,7 +169,7 @@
               <label for="methodSelect">Método de cálculo</label>
               <div class="select-wrap">
                 <select id="methodSelect">
-                  <option value="chopra">Chopra (8 constantes)</option>
+                  <option value="chopra" title="Interpolación de la Excitación">Interpolación</option>
                   <option value="directa">Integración directa</option>
                 </select>
               </div>
@@ -188,7 +198,7 @@
             </div>
 
             <div class="chart-block">
-              <h3 class="chart-block__title" id="spectrumTitle">Espectro de respuesta — Chopra (8 constantes)</h3>
+              <h3 class="chart-block__title" id="spectrumTitle">Espectro de respuesta — Interpolación de la Excitación</h3>
               <div class="chart-wrap">
                 <canvas id="chartCanvas"></canvas>
                 <canvas id="chartOverlay"></canvas>

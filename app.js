@@ -55,6 +55,7 @@ const REF_CHECK3 = { bhuj78: 0.1061, bhuj348: 0.0795, bhujUP: 0.0704, valp290: 0
 
 const records = {};      // key -> { def, filename, N, dt, peakNative, peakCm, agFull }
 const sweepCache = {};   // key -> { results: [xi0..xi4] each {resp:Float64Array}, mean: {resp:Float64Array} }
+const customRecordKeys = []; // registros cargados que no están en RECORD_DEFS (cualquier otro archivo), en orden de subida
 let step7Passed = false;
 let worker = null;
 let currentComputingKey = null;
@@ -101,6 +102,36 @@ function detectEqAndComp(filename, text) {
 function findDef(eq, comp) {
   if (!eq || !comp) return null;
   return RECORD_DEFS.find((d) => d.eq === eq && d.comp === String(comp).toUpperCase()) || null;
+}
+
+function slugify(filename) {
+  return filename.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'archivo';
+}
+
+function cleanFilenameLabel(filename) {
+  let base = filename.replace(/\.[^./\\]+$/, '').replace(/[_-]+/g, ' ').trim();
+  if (base.length > 48) base = base.slice(0, 45) + '…';
+  return base || filename;
+}
+
+// Construye una "definición" sobre la marcha para un archivo que no es ninguno
+// de los 5 de la tabla 1 del SPEC: así se puede graficar como un registro más,
+// sin valores de referencia para comparar (no aplica el chequeo de la sección 7).
+function buildCustomDef(filename, header) {
+  const isBhuj = header.format === 'bhuj';
+  return {
+    key: 'custom_' + slugify(filename),
+    label: cleanFilenameLabel(filename),
+    eq: null,
+    comp: null,
+    N: header.N,
+    dt: header.dt,
+    peakCm: null, // sin valor de referencia: el acelerograma se autoescala a los datos reales
+    g: isBhuj ? 9.80665 : 980.665,
+    lengthUnit: isBhuj ? 'm' : 'cm',
+    accelUnit: isBhuj ? 'm/s²' : 'cm/s²',
+    custom: true,
+  };
 }
 
 function extractHeaderInfo(text) {
@@ -150,11 +181,13 @@ function buildAgFull(agData, N) {
 
 function parseRecordFile(filename, text) {
   const { eq, comp } = detectEqAndComp(filename, text);
-  const def = findDef(eq, comp);
-  if (!def) throw new Error(`No se pudo identificar el registro a partir de "${filename}" (sismo=${eq || '?'}, comp=${comp || '?'}).`);
-
   const header = extractHeaderInfo(text);
   if (!header) throw new Error(`No se pudo leer la cabecera de "${filename}" (formato no reconocido).`);
+
+  // Si el archivo no corresponde a ninguno de los 5 registros de la tabla 1,
+  // se admite igual como registro adicional (sin valores de referencia),
+  // en vez de rechazarlo.
+  const def = findDef(eq, comp) || buildCustomDef(filename, header);
 
   const agData = extractAccelData(text, header.N, header.dataStart);
   let peakNative = 0;
@@ -291,6 +324,40 @@ function renderValidationTable() {
 }
 renderValidationTable();
 
+function renderCustomFilesList() {
+  const wrap = document.getElementById('customFilesWrap');
+  const hint = document.getElementById('customFilesHint');
+  const body = document.getElementById('customFilesBody');
+  if (!customRecordKeys.length) { wrap.hidden = true; hint.hidden = true; return; }
+  wrap.hidden = false;
+  hint.hidden = false;
+  body.innerHTML = '';
+  for (const key of customRecordKeys) {
+    const rec = records[key];
+    if (!rec) continue;
+    const tr = document.createElement('tr');
+    const tdFile = document.createElement('td');
+    tdFile.style.textAlign = 'left';
+    tdFile.textContent = rec.filename;
+    const tdPts = document.createElement('td');
+    tdPts.className = 'num';
+    tdPts.textContent = String(rec.N);
+    const tdPeak = document.createElement('td');
+    tdPeak.className = 'num';
+    tdPeak.textContent = rec.peakCm.toFixed(2);
+    const tdStatus = document.createElement('td');
+    const span = document.createElement('span');
+    span.className = 'tag ok';
+    span.textContent = 'Cargado';
+    tdStatus.appendChild(span);
+    tr.appendChild(tdFile);
+    tr.appendChild(tdPts);
+    tr.appendChild(tdPeak);
+    tr.appendChild(tdStatus);
+    body.appendChild(tr);
+  }
+}
+
 async function handleFiles(fileList) {
   const files = Array.from(fileList);
   for (const file of files) {
@@ -298,13 +365,24 @@ async function handleFiles(fileList) {
       const text = await file.text();
       const rec = parseRecordFile(file.name, text);
       records[rec.def.key] = rec;
+      if (rec.def.custom) {
+        if (!customRecordKeys.includes(rec.def.key)) customRecordKeys.push(rec.def.key);
+        // Si se vuelve a subir el mismo archivo (misma clave), el barrido viejo
+        // queda obsoleto — se recalcula con los datos nuevos en vez de mostrar
+        // una gráfica que ya no corresponde al archivo cargado.
+        delete sweepCache[cacheKey(rec.def.key, 'chopra')];
+        delete sweepCache[cacheKey(rec.def.key, 'directa')];
+        if (!plotSection.classList.contains('locked')) addRegistroOption(rec.def.key, rec.def.label);
+      }
     } catch (err) {
       console.error('Error procesando', file.name, err);
       showError(`Error al procesar "${file.name}": ${err.message}`);
     }
   }
   renderValidationTable();
+  renderCustomFilesList();
   maybeRunStep7();
+  if (!plotSection.classList.contains('locked') && registroSelect.options.length) onRegistroChange();
 }
 window.handleFiles = handleFiles; // expuesto para pruebas automatizadas
 
@@ -417,7 +495,7 @@ function runStep7() {
     check3Body.appendChild(tr);
   }
 
-  // Chequeo 4: Chopra vs. integración directa (deben coincidir a precisión de máquina)
+  // Chequeo 4: Interpolación de la Excitación vs. integración directa (deben coincidir a precisión de máquina)
   check4Body.innerHTML = '';
   for (const def of RECORD_DEFS) {
     const rec = records[def.key];
@@ -478,14 +556,18 @@ const legendEl = document.getElementById('legend');
 
 const hiddenSeriesKeys = new Set(); // series ocultadas por clic en la leyenda (persiste entre cambios)
 
+function addRegistroOption(key, label) {
+  if (registroSelect.querySelector(`option[value="${CSS.escape(key)}"]`)) return;
+  const opt = document.createElement('option');
+  opt.value = key;
+  opt.textContent = label;
+  registroSelect.appendChild(opt);
+}
+
 function initPlotSection() {
   if (registroSelect.options.length) return; // ya inicializado
-  for (const def of RECORD_DEFS) {
-    const opt = document.createElement('option');
-    opt.value = def.key;
-    opt.textContent = def.label;
-    registroSelect.appendChild(opt);
-  }
+  for (const def of RECORD_DEFS) addRegistroOption(def.key, def.label);
+  for (const key of customRecordKeys) addRegistroOption(key, records[key].def.label);
   for (const meta of RESP_META) {
     const opt = document.createElement('option');
     opt.value = meta.key;
@@ -703,7 +785,7 @@ function drawCurrentChart() {
   renderLegend(series);
   pulseChartIn(chartCanvas);
 
-  const methodLabel = methodSelect.value === 'directa' ? 'Integración directa' : 'Chopra (8 constantes)';
+  const methodLabel = methodSelect.value === 'directa' ? 'Integración directa' : 'Interpolación de la Excitación';
   document.getElementById('spectrumTitle').textContent = `Espectro de respuesta — ${methodLabel}`;
 }
 
@@ -767,15 +849,17 @@ function drawAccelChart(key) {
     y[i] = rec.agFull[i] * toCm;
   }
   const series = [{ key: 'accel', data: y, color: ACCEL_COLOR, width: 1, dash: [], label: 'ag' }];
-  // Eje Y fijo en ± el pico de referencia de la tabla 1 del SPEC (cm/s²), no un
-  // valor auto-escalado con margen: el pico real toca exactamente el borde del
-  // marco, y el máximo es literalmente el número pedido (104, 78, 69, 174, 131).
-  lastAccelState = drawChart(accelCanvas, accelOverlay, t, series, 't (s)', 'ag(t)  [cm/s²]', {
-    yFixedBound: def.peakCm,
+  // Eje Y fijo en ± el pico de referencia de la tabla 1 del SPEC (cm/s²) para los
+  // 5 registros conocidos, no un valor auto-escalado con margen: el pico real
+  // toca exactamente el borde del marco. Un archivo adicional sin referencia
+  // (def.peakCm == null) se autoescala a su propio pico real.
+  const accelOpts = {
     xTickCount: 5,
     xTickFormat: (v) => Math.round(v).toString(),
     yTickFormat: (v) => Math.round(v).toString(),
-  });
+  };
+  if (def.peakCm != null) accelOpts.yFixedBound = def.peakCm;
+  lastAccelState = drawChart(accelCanvas, accelOverlay, t, series, 't (s)', 'ag(t)  [cm/s²]', accelOpts);
   pulseChartIn(accelCanvas);
 }
 
